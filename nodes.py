@@ -48,19 +48,23 @@ class CachingCLIPTextEncode:
         Returns:
             Tuple containing conditioning and pooled outputs
         """
+        
+        # Update cache limit
+        self.cache_limit = cache_limit
+        cache_len = len(self.cache)
 
         # Generate hash for input text
         clip_address = str(id(clip))
         text_hash = self.get_text_hash(text + clip_address)
 
         # Check if hash exists in cache dictionary
-        if text_hash in self.cache["hash"]:
+        if text_hash in self.cache:
                 
                 # Check if address of clip object is the same. It's required if you switch CLIP model that renders cached data invalid.
-                if clip_address == self.cache["hash"][text_hash]["clip_address"]:
+                if clip_address == self.cache[text_hash]["clip_address"]:
                     
                     # Return cached data if text matches
-                    return ([[self.cache["hash"][text_hash]["cond"], self.cache["hash"][text_hash]["pooled_output"]]],)
+                    return ([[self.cache[text_hash]["cond"], self.cache[text_hash]["pooled_output"]]], )
 
         # Generate new encodings if inputs changed
         tokens = clip.tokenize(text)
@@ -68,7 +72,7 @@ class CachingCLIPTextEncode:
         cond = output.pop("cond")
 
         # Create new cache entry for this hash
-        self.cache["hash"][text_hash] = {
+        self.cache[text_hash] = {
             "clip_address": clip_address,
             "text": text,
             "cond": cond,
@@ -76,9 +80,9 @@ class CachingCLIPTextEncode:
         }
 
         # Check cache size and remove oldest entry if limit reached
-        if len(self.cache["hash"]) >= cache_limit:
-            first_key = next(iter(self.cache["hash"]))
-            del self.cache["hash"][first_key]
+        if cache_len >= cache_limit:
+            first_key = next(iter(self.cache))
+            del self.cache[first_key]
 
         return ([[cond, output]], )
 
@@ -137,21 +141,25 @@ class CachingCLIPTextEncodeFlux:
             Tuple containing conditioning and pooled outputs
         """
 
+        # Update cache limit
+        self.cache_limit = cache_limit
+        cache_len = len(self.cache)
+
         # Generate hash for input text
         clip_address = str(id(clip))
         text_hash = self.get_text_hash(clip_l + t5xxl + clip_address)
 
         # Check if hash exists in cache dictionary
-        if text_hash in self.cache["hash"]:
+        if text_hash in self.cache:
                 
                 # Check if address of clip object is the same. It's required if you switch CLIP model that renders cached data invalid.
-                if clip_address == self.cache["hash"][text_hash]["clip_address"]:
-
+                if clip_address == self.cache[text_hash]["clip_address"]:
+        
                     # Adjust guidance as it may change by user
-                    self.cache["hash"][text_hash]["guidance"] = guidance
-
+                    self.cache[text_hash]["guidance"] = guidance
+            
                     # Return cached data if text matches
-                    return ([[self.cache["hash"][text_hash]["cond"], self.cache["hash"][text_hash]["pooled_output"]]],)
+                    return ([[self.cache[text_hash]["cond"], self.cache[text_hash]["pooled_output"]]], )
 
         # Generate new encodings if inputs changed
         tokens = clip.tokenize(clip_l)
@@ -162,7 +170,7 @@ class CachingCLIPTextEncodeFlux:
         output["guidance"] = guidance
 
         # Create new cache entry for this hash
-        self.cache["hash"][text_hash] = {
+        self.cache[text_hash] = {
             "clip_address": clip_address,
             "clip_l": clip_l,
             "t5xxl": t5xxl,
@@ -171,9 +179,9 @@ class CachingCLIPTextEncodeFlux:
         }
 
         # Check cache size and remove oldest entry if limit reached
-        if len(self.cache["hash"]) >= cache_limit:
-            first_key = next(iter(self.cache["hash"]))
-            del self.cache["hash"][first_key]
+        if cache_len >= cache_limit:
+            first_key = next(iter(self.cache))
+            del self.cache[first_key]
 
         return ([[cond, output]], )
 
